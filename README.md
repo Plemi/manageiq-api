@@ -12,6 +12,17 @@ the public REST API for ManageIQ.
 
 [![Chat](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/ManageIQ/api?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
+## Forked project
+
+This fork of the official ManageIQ::Api plugin aimes at adding support for API auth token generation for SSO (SAML, OIDC) user authentication. It is based on this PR https://github.com/ManageIQ/manageiq/pull/14959/files by Abellotti.
+
+To work properly, it must be used alongside these other forks of official ManageIQ projects / modules : 
+- Core ManageIQ app : https://github.com/Plemi/manageiq (which has a modified Gemfile to install the forked API plugin version)
+- Service UI app : https://github.com/Plemi/manageiq-ui-service
+
+In order to use this forked plugin in a docker context, it is also advised to rely on this fork of manageiq-pods project to build proper docker images :
+- https://github.com/Plemi/manageiq-pods
+
 ## Contributing
 
 ### Prerequisites
