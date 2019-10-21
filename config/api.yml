@@ -1235,6 +1235,33 @@
       :get:
       - :name: read
         :identifier: firmware
+  :firmware_registries:
+    :description: Firmware Registries
+    :options:
+    - :collection
+    :verbs: *gpd
+    :klass: FirmwareRegistry
+    :collection_actions:
+      :get:
+      - :name: read
+        :identifier: firmware
+      :post:
+      - :name: create
+        :identifier: firmware
+      - :name: delete
+        :identifier: firmware
+      - :name: sync_fw_binaries
+        :identifier: firmware
+    :resource_actions:
+      :get:
+      - :name: read
+        :identifier: firmware
+      :delete:
+      - :name: delete
+        :identifier: firmware
+      :post:
+      - :name: sync_fw_binaries
+        :identifier: firmware
   :firmwares:
     :description: Firmwares
     :options:
@@ -3879,7 +3906,9 @@
       - :name: request_console
         :identifier:
         - vm_html5_console
+        - vm_vmrc_console
         - sui_vm_html5_console
+        - sui_vm_vmrc_console
         - sui_vm_web_console
       - :name: reset
         :identifier: vm_reset
@@ -3949,7 +3978,9 @@
       - :name: request_console
         :identifier:
         - vm_html5_console
+        - vm_vmrc_console
         - sui_vm_html5_console
+        - sui_vm_vmrc_console
         - sui_vm_web_console
       - :name: reset
         :identifier: vm_reset
