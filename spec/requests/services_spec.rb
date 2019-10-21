@@ -267,7 +267,7 @@ describe "Services API" do
                                                    {"action" => "remove", "path" => "description"},
                                                    {"action" => "add",    "path" => "display", "value" => true}])
 
-      expect_single_resource_query("id" => svc.id.to_s, "name" => "updated svc1", "display" => true)
+      expect_single_resource_query("id" => svc.id.to_s, "name" => "updated svc1", "visible" => true)
       expect(svc.reload.name).to eq("updated svc1")
       expect(svc.description).to be_nil
       expect(svc.display).to be_truthy
@@ -276,7 +276,7 @@ describe "Services API" do
     it "supports edits of single resource via a standard PATCH" do
       api_basic_authorize collection_action_identifier(:services, :edit)
 
-      updated_service_attributes = { "name" => "updated svc1", "description" => nil, "display" => true }
+      updated_service_attributes = { "name" => "updated svc1", "description" => nil, "visible" => true }
 
       patch(api_service_url(nil, svc), :params => updated_service_attributes)
 
@@ -581,7 +581,7 @@ describe "Services API" do
     let(:vm3) { FactoryBot.create(:vm_vmware, :hardware => hw3, :evm_owner_id => super_admin.id) }
 
     before do
-      @user.current_group.miq_user_role.update_attributes(:settings => {:restrictions => {:vms => :user_or_group}})
+      @user.current_group.miq_user_role.update(:settings => {:restrictions => {:vms => :user_or_group}})
       api_basic_authorize(action_identifier(:services, :read, :resource_actions, :get))
 
       svc1 << vm1
@@ -1226,7 +1226,7 @@ describe "Services API" do
 
     it 'can add the provider vms to the queue' do
       api_basic_authorize action_identifier(:services, :add_provider_vms)
-      svc.update_attributes!(:evm_owner => @user)
+      svc.update!(:evm_owner => @user)
 
       post(api_service_url(nil, svc), :params => { :action => 'add_provider_vms',
                                                    :provider => { :href => api_provider_url(nil, ems) }, :uid_ems => ['uids'] })
@@ -1272,8 +1272,8 @@ describe "Services API" do
 
     it 'can bulk add_provider_vms' do
       api_basic_authorize action_identifier(:services, :add_provider_vms)
-      svc.update_attributes!(:evm_owner => @user)
-      svc2.update_attributes!(:evm_owner => @user)
+      svc.update!(:evm_owner => @user)
+      svc2.update!(:evm_owner => @user)
 
       post(api_services_url, :params => { :action    => 'add_provider_vms',
                                           :resources => [

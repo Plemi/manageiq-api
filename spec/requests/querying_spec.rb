@@ -351,7 +351,7 @@ describe "Querying" do
 
     it "supports NULL/nil equality test via =" do
       vm1, vm2 = create_vms_by_name(%w(aa bb))
-      vm2.update_attributes!(:retired => true)
+      vm2.update!(:retired => true)
 
       get api_vms_url, :params => { :expand => "resources", :filter => ["retired=NULL"] }
 
@@ -361,7 +361,7 @@ describe "Querying" do
 
     it "supports NULL/nil inequality test via !=" do
       _vm1, vm2 = create_vms_by_name(%w(aa bb))
-      vm2.update_attributes!(:retired => true)
+      vm2.update!(:retired => true)
 
       get api_vms_url, :params => { :expand => "resources", :filter => ["retired!=nil"] }
 
@@ -650,8 +650,8 @@ describe "Querying" do
     end
 
     it "can do fuzzy matching on strings with forward slashes" do
-      tag_1 = FactoryBot.create(:tag, :name => "/managed/foo")
-      _tag_2 = FactoryBot.create(:tag, :name => "/managed/bar")
+      tag_1 = FactoryBot.create(:classification, :name => "foo").tag
+      _tag_2 = FactoryBot.create(:classification, :name => "bar")
       api_basic_authorize collection_action_identifier(:tags, :read, :get)
 
       get(api_tags_url, :params => { :filter => ["name='*/foo'"] })

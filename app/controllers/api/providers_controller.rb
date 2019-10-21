@@ -84,24 +84,9 @@ module Api
     end
 
     def options
-      providers_options = ManageIQ::Providers::BaseManager.leaf_subclasses.inject({}) do |po, ems|
-        po.merge(ems.ems_type => ems.options_description)
-      end
-
-      supported_providers = ExtManagementSystem.supported_types_for_create.map do |klass|
-        if klass.supports_regions?
-          regions = klass.parent::Regions.all.sort_by { |r| r[:description] }.map { |r| r.slice(:name, :description) }
-        end
-
-        {
-          :title   => klass.description,
-          :type    => klass.to_s,
-          :kind    => klass.to_s.demodulize.sub(/Manager$/, '').underscore,
-          :regions => regions
-        }.compact
-      end
-
-      render_options(:providers, "provider_settings" => providers_options, "supported_providers" => supported_providers)
+      options = providers_options
+      options['provider_form_schema'] = provider_options(params[:type]) if params[:type]
+      render_options(:providers, options)
     end
 
     def pause_resource(type, id, _data)
@@ -129,7 +114,46 @@ module Api
       end
     end
 
+    def verify_credentials_resource(_type, _id, data = {})
+      klass = fetch_provider_klass(collection_class(:providers), data)
+      zone_name = fetch_zone(data).name
+      task_id = klass.verify_credentials_task(current_user, zone_name, data)
+      action_result(true, 'Credentials sent for verification', :task_id => task_id)
+    rescue => err
+      action_result(false, err.to_s)
+    end
+
     private
+
+    def provider_options(type)
+      klass = type.safe_constantize
+
+      raise BadRequestError, "Invalid provider - #{type}" unless klass.try(:<, ExtManagementSystem)
+      raise BadRequestError, "No DDF specified for - #{type}" unless klass.respond_to?(:params_for_create)
+
+      klass.params_for_create
+    end
+
+    def providers_options
+      providers_options = ManageIQ::Providers::BaseManager.leaf_subclasses.inject({}) do |po, ems|
+        po.merge(ems.ems_type => ems.options_description)
+      end
+
+      supported_providers = ExtManagementSystem.supported_types_for_create.map do |klass|
+        if klass.supports_regions?
+          regions = klass.parent::Regions.all.sort_by { |r| r[:description] }.map { |r| r.slice(:name, :description) }
+        end
+
+        {
+          :title   => klass.description,
+          :type    => klass.to_s,
+          :kind    => klass.to_s.demodulize.sub(/Manager$/, '').underscore,
+          :regions => regions
+        }.compact
+      end
+
+      { "provider_settings" => providers_options, "supported_providers" => supported_providers }
+    end
 
     # Process password change request for a single resource
     #
@@ -193,7 +217,7 @@ module Api
 
     def edit_provider(provider, data)
       update_data = fetch_provider_data(provider.class, data)
-      provider.update_attributes(update_data) if update_data.present?
+      provider.update(update_data) if update_data.present?
       update_provider_authentication(provider, data)
       provider
     rescue => err
