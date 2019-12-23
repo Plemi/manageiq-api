@@ -1031,7 +1031,7 @@
     :options:
     - :collection
     :verbs: *g
-    :klass: ChargebackRateDetailCurrency
+    :klass: Currency
   :custom_attributes:
     :description: Custom Attributes
     :options:
@@ -1217,9 +1217,11 @@
     :collection_actions:
       :get:
       - :name: read
+        :identifier: ems_infra
     :resource_actions:
       :get:
       - :name: read
+        :identifier: ems_infra
   :event_streams:
     :description: Event Streams
     :options:
@@ -1276,7 +1278,9 @@
     :subcollection_actions:
       :post:
       - :name: assign
+        :identifier: rbac_role_edit
       - :name: unassign
+        :identifier: rbac_role_edit
   :firmware_binaries:
     :description: Firmware Binaries
     :options:
@@ -2621,7 +2625,7 @@
     - :settings
     :options:
     - :collection
-    :verbs: *gp
+    :verbs: *gpd
     :klass: MiqRegion
     :collection_actions:
       :get:
@@ -2630,10 +2634,22 @@
       :post:
       - :name: query
         :identifier: region
+      - :name: edit
+        :identifier: region_edit
+      - :name: delete
+        :identifier: region_delete
     :resource_actions:
       :get:
       - :name: read
         :identifier: region
+      :post:
+      - :name: edit
+        :identifier: region_edit
+      - :name: delete
+        :identifier: region_delete
+      :delete:
+      - :name: delete
+        :identifier: region_delete
   :reports:
     :description: Reports
     :identifier: miq_report
@@ -2966,8 +2982,31 @@
     - :settings
     :options:
     - :collection
-    :verbs: *g
+    :verbs: *gpd
     :klass: MiqServer
+    :collection_actions:
+      :get:
+      - :name: read
+        :identifier: ops_diagnostics
+      :post:
+      - :name: query
+        :identifier: ops_diagnostics
+      - :name: edit
+        :identifier: ops_settings
+      - :name: delete
+        :identifier: ops_settings
+    :resource_actions:
+      :get:
+      - :name: read
+        :identifier: ops_diagnostics
+      :post:
+      - :name: edit
+        :identifier: ops_settings
+      - :name: delete
+        :identifier: ops_settings
+      :delete:
+      - :name: delete
+        :identifier: ops_settings
   :service_catalogs:
     :description: Service Catalogs
     :identifier: st_catalog_accord
@@ -4184,7 +4223,7 @@
     - :collection
     :subcollections:
     - :settings
-    :verbs: *gp
+    :verbs: *gpd
     :klass: Zone
     :collection_actions:
       :get:
@@ -4193,15 +4232,12 @@
       :post:
       - :name: query
         :identifier: zone
-      - :name: add
+      - :name: create
         :identifier: zone_new
-        :disabled: true
       - :name: edit
         :identifier: zone_edit
-        :disabled: true
       - :name: delete
         :identifier: zone_delete
-        :disabled: true
     :resource_actions:
       :get:
       - :name: read
@@ -4209,8 +4245,8 @@
       :post:
       - :name: edit
         :identifier: zone_edit
-        :disabled: true
+      - :name: delete
+        :identifier: zone_delete
       :delete:
       - :name: delete
         :identifier: zone_delete
-        :disabled: true

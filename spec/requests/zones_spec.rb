@@ -1,7 +1,147 @@
 RSpec.describe "Zones" do
   let(:zone) { FactoryBot.create(:zone) }
 
-  describe "/api/zones/:id?expand=settings" do
+  context "authorization", :authorization do
+    it "forbids access to zones without an appropriate role" do
+      expect_forbidden_request { get(api_zones_url) }
+    end
+
+    it "forbids access to a zone resource without an appropriate role" do
+      expect_forbidden_request { get(api_zone_url(nil, zone)) }
+    end
+  end
+
+  context "get", :get do
+    it "allows GETs of a zone" do
+      api_basic_authorize action_identifier(:zones, :read, :resource_actions, :get)
+
+      get(api_zone_url(nil, zone))
+
+      expect_single_resource_query(
+        "href" => api_zone_url(nil, zone),
+        "id"   => zone.id.to_s
+      )
+    end
+  end
+
+  context "edit", :edit do
+    it "will fail if you try to edit invalid fields" do
+      api_basic_authorize action_identifier(:zones, :edit)
+
+      zone = FactoryBot.create(:zone, :description => "Current Zone description")
+
+      post api_zone_url(nil, zone), :params => gen_request(:edit, :created_on => Time.now.utc)
+      expect_bad_request("Attribute(s) 'created_on' should not be specified for updating a zone resource")
+
+      post api_zone_url(nil, zone), :params => gen_request(:edit, :updated_on => Time.now.utc)
+      expect_bad_request("Attribute(s) 'updated_on' should not be specified for updating a zone resource")
+    end
+
+    it "can update multiple zones with POST" do
+      api_basic_authorize action_identifier(:zones, :edit)
+
+      zone1 = FactoryBot.create(:zone, :description => "Test Zone 1")
+      zone2 = FactoryBot.create(:zone, :description => "Test Zone 2")
+
+      options = [
+        {"href" => api_zone_url(nil, zone1), "description" => "Updated Test Zone 1"},
+        {"href" => api_zone_url(nil, zone2), "description" => "Updated Test Zone 2"}
+      ]
+
+      post api_zones_url, :params => gen_request(:edit, options)
+
+      expect(response).to have_http_status(:ok)
+
+      expect_results_to_match_hash(
+        "results",
+        [
+          {"id" => zone1.id.to_s, "description" => "Updated Test Zone 1"},
+          {"id" => zone2.id.to_s, "description" => "Updated Test Zone 2"}
+        ]
+      )
+
+      expect(zone1.reload.description).to eq("Updated Test Zone 1")
+      expect(zone2.reload.description).to eq("Updated Test Zone 2")
+    end
+
+    it "will fail to update multiple zones if any invalid fields are edited" do
+      api_basic_authorize action_identifier(:zones, :edit)
+
+      zone1 = FactoryBot.create(:zone, :description => "Test Zone 1")
+      zone2 = FactoryBot.create(:zone, :description => "Test Zone 2")
+
+      options = [
+        {"href" => api_zone_url(nil, zone1), "description" => "New description"},
+        {"href" => api_zone_url(nil, zone2), "created_on" => Time.now.utc}
+      ]
+
+      post api_zones_url, :params => gen_request(:edit, options)
+
+      expect_bad_request("Attribute(s) 'created_on' should not be specified for updating a zone resource")
+    end
+
+    it "forbids edit of a zone without an appropriate role" do
+      expect_forbidden_request do
+        zone = FactoryBot.create(:zone, :description => "Current Zone description")
+        post(api_zone_url(nil, zone), :params => gen_request(:edit, :description => "New Zone description"))
+      end
+    end
+  end
+
+  context "delete", :delete do
+    it "can delete a zone with POST" do
+      api_basic_authorize action_identifier(:zones, :delete)
+      zone = FactoryBot.create(:zone)
+
+      expect { post api_zone_url(nil, zone), :params => gen_request(:delete) }.to change(Zone, :count).by(-1)
+      expect(response).to have_http_status(:ok)
+    end
+
+    it "cannot delete a default zone with POST" do
+      api_basic_authorize action_identifier(:zones, :delete)
+      zone = FactoryBot.create(:zone, :name => 'default')
+
+      expect { post api_zone_url(nil, zone), :params => gen_request(:delete) }.to change(Zone, :count).by(0)
+      expect_single_action_result(:success => false, :message => 'cannot delete default zone')
+    end
+
+    it "can delete a zone with DELETE" do
+      api_basic_authorize action_identifier(:zones, :delete)
+      zone = FactoryBot.create(:zone)
+
+      expect { delete api_zone_url(nil, zone) }.to change(Zone, :count).by(-1)
+      expect(response).to have_http_status(:no_content)
+    end
+
+    it "cannot delete a default zone with DELETE" do
+      api_basic_authorize action_identifier(:zones, :delete)
+      zone = FactoryBot.create(:zone, :name => 'default')
+
+      expect { delete api_zone_url(nil, zone) }.to change(Zone, :count).by(0)
+    end
+
+    it "can delete multiple zones with POST" do
+      api_basic_authorize action_identifier(:zones, :delete)
+      zones = FactoryBot.create_list(:zone, 2)
+
+      options = [
+        {"href" => api_zone_url(nil, zones.first)},
+        {"href" => api_zone_url(nil, zones.last)}
+      ]
+
+      expect { post api_zones_url, :params => gen_request(:delete, options) }.to change(Zone, :count).by(-2)
+      expect(response).to have_http_status(:ok)
+    end
+
+    it "forbids deletion of a zone without an appropriate role" do
+      expect_forbidden_request do
+        zone = FactoryBot.create(:zone, :description => "Current Region description")
+        delete api_zone_url(nil, zone)
+      end
+    end
+  end
+
+  describe "/api/zones/:id?expand=settings", :settings do
     it "expands the settings subcollection" do
       api_basic_authorize(action_identifier(:zones, :read, :resource_actions, :get), :ops_settings)
 
@@ -33,11 +173,7 @@ RSpec.describe "Zones" do
     end
 
     it "does not allow an authenticated user who doesn't have the proper role to view the settings" do
-      api_basic_authorize
-
-      get(api_zone_settings_url(nil, zone))
-
-      expect(response).to have_http_status(:forbidden)
+      expect_forbidden_request { get(api_zone_settings_url(nil, zone)) }
     end
 
     it "does not allow an unauthenticated user to view the settings" do
