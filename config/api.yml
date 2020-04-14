@@ -693,6 +693,12 @@
         :identifier: ems_cluster_protect
       - :name: unassign
         :identifier: ems_cluster_protect
+  :compliances:
+    :description: Compliances
+    :options:
+    - :subcollection
+    :verbs: *g
+    :klass: Compliance
   :conditions:
     :description: Conditions
     :identifier: condition
@@ -1165,9 +1171,11 @@
     :collection_actions:
       :get:
       - :name: read
+        :identifier: ems_infra
     :resource_actions:
       :get:
       - :name: read
+        :identifier: ems_infra
   :event_streams:
     :description: Event Streams
     :options:
@@ -1224,7 +1232,9 @@
     :subcollection_actions:
       :post:
       - :name: assign
+        :identifier: rbac_role_edit
       - :name: unassign
+        :identifier: rbac_role_edit
   :firmware_binaries:
     :description: Firmware Binaries
     :options:
@@ -1532,6 +1542,7 @@
     - :policies
     - :policy_profiles
     - :lans
+    - :custom_attributes
     :collection_actions:
       :get:
       - :name: read
@@ -1625,6 +1636,14 @@
       :get:
       - :name: read
         :identifier: host_show
+    :custom_attributes_subcollection_actions:
+      :post:
+      - :name: add
+        :identifier: host_edit
+      - :name: edit
+        :identifier: host_edit
+      - :name: delete
+        :identifier: host_edit
   :instances:
     :description: Instances
     :identifier: instance
@@ -2163,7 +2182,7 @@
     :options:
     - :collection
     - :subcollection
-    :verbs: *gp
+    :verbs: *gpppd
     :klass: MiqPolicySet
     :subcollections:
     - :policies
@@ -2174,15 +2193,12 @@
       :post:
       - :name: query
         :identifier: policy_profile_view
-      - :name: add
+      - :name: create
         :identifier: profile_new
-        :disabled: true
       - :name: edit
         :identifier: profile_edit
-        :disabled: true
       - :name: delete
         :identifier: profile_delete
-        :disabled: true
     :resource_actions:
       :get:
       - :name: read
@@ -2190,11 +2206,11 @@
       :post:
       - :name: edit
         :identifier: profile_edit
-        :disabled: true
+      - :name: delete
+        :identifier: profile_delete
       :delete:
       - :name: delete
         :identifier: profile_delete
-        :disabled: true
     :policies_subcollection_actions:
       :post:
       - :name: assign
@@ -2247,7 +2263,17 @@
         - ems_infra_show_list
         - ems_block_storage_show_list
       - :name: create
-        :identifier: ems_infra_new
+        :identifiers:
+        - :klass: ManageIQ::Providers::InfraManager
+          :identifier: ems_infra_new
+        - :klass: ManageIQ::Providers::CloudManager
+          :identifier: ems_cloud_new
+        - :klass: ManageIQ::Providers::ContainerManager
+          :identifier: ems_container_new
+        - :klass: ManageIQ::Providers::NetworkManager
+          :identifier: ems_network_new
+        - :klass: Provider
+          :identifier: provider_foreman_add_provider
       - :name: edit
         :identifier: ems_infra_edit
       - :name: refresh
@@ -2256,10 +2282,6 @@
         - ems_cloud_refresh
       - :name: delete
         :identifier: ems_infra_delete
-      - :name: pause
-        :identifier: ems_infra_edit
-      - :name: resume
-        :identifier: ems_infra_edit
     :resource_actions:
       :get:
       - :name: read
@@ -2281,10 +2303,6 @@
         :identifier: ems_infra_import_vm
         :options:
         - :validate_action
-      - :name: pause
-        :identifier: ems_infra_edit
-      - :name: resume
-        :identifier: ems_infra_edit
       :delete:
       - :name: delete
         :identifier: ems_infra_delete
@@ -2468,20 +2486,16 @@
     - :pxe_images
     - :pxe_menus
     :collection_actions:
+      :get:
+      - :name: read
+        :identifier: pxe_server_view
       :post:
       - :name: create
         :identifier: pxe_server_create
       - :name: edit
         :identifier: pxe_server_edit
-      :patch:
-      - :name: edit
-        :identifier: pxe_server_edit
-      :delete:
       - :name: delete
         :identifier: pxe_server_delete
-      :get:
-      - :name: read
-        :identifier: pxe_server_view
     :resource_actions:
       :get:
       - :name: read
@@ -2580,10 +2594,15 @@
       :post:
       - :name: query
         :identifier: region
+      - :name: edit
+        :identifier: region_edit
     :resource_actions:
       :get:
       - :name: read
         :identifier: region
+      :post:
+      - :name: edit
+        :identifier: region_edit
   :reports:
     :description: Reports
     :identifier: miq_report
@@ -2916,8 +2935,31 @@
     - :settings
     :options:
     - :collection
-    :verbs: *g
+    :verbs: *gpd
     :klass: MiqServer
+    :collection_actions:
+      :get:
+      - :name: read
+        :identifier: ops_diagnostics
+      :post:
+      - :name: query
+        :identifier: ops_diagnostics
+      - :name: edit
+        :identifier: ops_settings
+      - :name: delete
+        :identifier: ops_settings
+    :resource_actions:
+      :get:
+      - :name: read
+        :identifier: ops_diagnostics
+      :post:
+      - :name: edit
+        :identifier: ops_settings
+      - :name: delete
+        :identifier: ops_settings
+      :delete:
+      - :name: delete
+        :identifier: ops_settings
   :service_catalogs:
     :description: Service Catalogs
     :identifier: st_catalog_accord
@@ -3854,6 +3896,7 @@
     - :policies
     - :policy_profiles
     - :accounts
+    - :compliances
     - :custom_attributes
     - :security_groups
     - :software
@@ -4015,12 +4058,24 @@
       - :name: read
         :identifier:
         - vm_show
+    :compliances_subcollection_actions:
+      :get:
+      - :name: get
+        :identifier:
+        - vm_show
+        - vm_check_compliance
+        - instance_check_compliance
     :disks_subresource_actions:
       :get:
       - :name: read
         :identifier:
         - vm_show
     :cdroms_subresource_actions:
+      :get:
+      - :name: read
+        :identifier:
+        - vm_show
+    :compliances_subresource_actions:
       :get:
       - :name: read
         :identifier:
@@ -4092,6 +4147,30 @@
         :identifier:
         - vm_snapshot_delete
         - sui_vm_snapshot_delete
+  :widgets:
+    :description: Miq Widgets
+    :identifier: miq_report_widget_admin
+    :options:
+    - :collection
+    :verbs: *gp
+    :klass: MiqWidget
+    :subcollections:
+    :collection_actions:
+      :get:
+      - :name: read
+        :identifier: miq_widget_show_list
+      :post:
+      - :name: query
+        :identifier: miq_widget_show_list
+      - :name: generate_content
+        :identifier: widget_generate_content
+    :resource_actions:
+      :get:
+      - :name: read
+        :identifier: miq_widget_show
+      :post:
+      - :name: generate_content
+        :identifier: widget_generate_content
   :zones:
     :description: Zones
     :identifier: zone
@@ -4099,7 +4178,7 @@
     - :collection
     :subcollections:
     - :settings
-    :verbs: *gp
+    :verbs: *gpd
     :klass: Zone
     :collection_actions:
       :get:
@@ -4108,15 +4187,12 @@
       :post:
       - :name: query
         :identifier: zone
-      - :name: add
+      - :name: create
         :identifier: zone_new
-        :disabled: true
       - :name: edit
         :identifier: zone_edit
-        :disabled: true
       - :name: delete
         :identifier: zone_delete
-        :disabled: true
     :resource_actions:
       :get:
       - :name: read
@@ -4124,8 +4200,8 @@
       :post:
       - :name: edit
         :identifier: zone_edit
-        :disabled: true
+      - :name: delete
+        :identifier: zone_delete
       :delete:
       - :name: delete
         :identifier: zone_delete
-        :disabled: true

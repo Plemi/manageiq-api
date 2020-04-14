@@ -104,22 +104,6 @@ module Api
       render_options(:providers, "provider_settings" => providers_options, "supported_providers" => supported_providers)
     end
 
-    def pause_resource(type, id, _data)
-      provider = resource_search(id, type, collection_class(type))
-      provider.pause!
-      action_result(true, "Paused #{provider_ident(provider)}")
-    rescue => err
-      action_result(false, "Could not pause Provider - #{err}")
-    end
-
-    def resume_resource(type, id, _data)
-      provider = resource_search(id, type, collection_class(type))
-      provider.resume!
-      action_result(true, "Resumed #{provider_ident(provider)}")
-    rescue => err
-      action_result(false, "Could not resume Provider - #{err}")
-    end
-
     # Process change_password action for a single resource or a collection of resources
     def change_password_resource(type, id, data = {})
       if single_resource?
@@ -130,6 +114,16 @@ module Api
     end
 
     private
+
+    def authorize_provider(typed_provider_klass)
+      create_action = collection_config["providers"].collection_actions.post.detect { |a| a.name == "create" }
+      provider_spec = create_action.identifiers.detect { |i| i.klass.constantize.name == typed_provider_klass.superclass.name }
+      raise BadRequestError, "Unsupported request class #{typed_provider_klass}" if provider_spec.blank?
+
+      if provider_spec.identifier && !api_user_role_allows?(provider_spec.identifier)
+        raise ForbiddenError, "Create action is forbidden for #{typed_provider_klass} requests"
+      end
+    end
 
     # Process password change request for a single resource
     #
@@ -183,12 +177,15 @@ module Api
     def create_provider(data)
       provider_klass = fetch_provider_klass(collection_class(:providers), data)
       create_data    = fetch_provider_data(provider_klass, data, :requires_zone => true)
-      provider       = provider_klass.create!(create_data)
-      update_provider_authentication(provider, data)
-      provider
-    rescue => err
-      provider.destroy if provider
+      authorize_provider(provider_klass)
+      begin
+        provider = provider_klass.create!(create_data)
+        update_provider_authentication(provider, data)
+        provider
+      rescue => err
+        provider&.destroy
       raise BadRequestError, "Could not create the new provider - #{err}"
+      end
     end
 
     def edit_provider(provider, data)

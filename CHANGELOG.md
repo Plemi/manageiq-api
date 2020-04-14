@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 
+## Ivanchuk-4
+
+### Added
+* Allow miq_regions to be edited [(#690)](https://github.com/ManageIQ/manageiq-api/pull/690)
+* Allow Zones to be edited deleted [(#691)](https://github.com/ManageIQ/manageiq-api/pull/691)
+* Add support for OpenID-Connect/OAuth2 in the API [(#737)](https://github.com/ManageIQ/manageiq-api/pull/737) and [(#747)](https://github.com/ManageIQ/manageiq-api/pull/747)
+* Add compliances subcollection [(#742)](https://github.com/ManageIQ/manageiq-api/pull/742)
+* Implemented Create/Edit/Delete resources for /api/policy_profiles [(#749)](https://github.com/ManageIQ/manageiq-api/pull/749)
+
+### Fixed
+* Remove container provider resume/pause [(#740)](https://github.com/ManageIQ/manageiq-api/pull/740)
+
+## Ivanchuk-2
+
+### Added
+* Expose error messages from ServiceTemplate.orderable?[(#656)](https://github.com/ManageIQ/manageiq-api/pull/656)
+* Add endpoints for widget content generation [(#660)](https://github.com/ManageIQ/manageiq-api/pull/660)
+* Added validations for the input params for conversion hosts. [(#683)](https://github.com/ManageIQ/manageiq-api/pull/683)
+
+
+### Fixed
+* Create TransformationMapping before Item (FIX CI FAILURE) [(#666)](https://github.com/ManageIQ/manageiq-api/pull/666)
+* Fixes the pxe_servers collection actions [(#678)](https://github.com/ManageIQ/manageiq-api/pull/678)
+* Include user info in widget generation [(#679)](https://github.com/ManageIQ/manageiq-api/pull/679)
+
 
 ## Ivanchuk-1
 
