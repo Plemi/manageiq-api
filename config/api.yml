@@ -275,6 +275,36 @@
       :get:
       - :name: read
         :identifier: miq_ae_domain_view
+  :automate_classes:
+    :description: Automate Classes
+    :identifier: miq_ae_class
+    :options:
+    - :collection
+    :verbs: *gpd
+    :klass: MiqAeClass
+    :collection_actions:
+      :get:
+      - :name: read
+        :identifier: miq_ae_class
+      :post:
+      - :name: query
+        :identifier: miq_ae_class
+      - :name: edit
+        :identifier: miq_ae_class_edit
+      - :name: delete
+        :identifier: miq_ae_class_delete
+    :resource_actions:
+      :get:
+      - :name: read
+        :identifier: miq_ae_class
+      :post:
+      - :name: edit
+        :identifier: miq_ae_class_edit
+      - :name: delete
+        :identifier: miq_ae_class_delete
+      :delete:
+      - :name: delete
+        :identifier: miq_ae_class_delete
   :automate_domains:
     :description: Automate Domains
     :options:
@@ -745,6 +775,12 @@
         :identifier: ems_cluster_protect
       - :name: unassign
         :identifier: ems_cluster_protect
+  :compliances:
+    :description: Compliances
+    :options:
+    - :subcollection
+    :verbs: *g
+    :klass: Compliance
   :conditions:
     :description: Conditions
     :identifier: condition
@@ -778,6 +814,29 @@
       :delete:
       - :name: delete
         :identifier: condition_delete
+  :configuration_profiles:
+    :description: Configuration Profiles
+    :options:
+    - :collection
+    - :subcollection
+    :verbs: *g
+    :klass: ConfigurationProfile
+    :collection_actions:
+      :get:
+      - :name: read
+        :identifier: configuration_profile_view
+    :resource_actions:
+      :get:
+      - :name: read
+        :identifier: configuration_profile_view
+    :subcollection_actions:
+      :get:
+      - :name: read
+        :identifier: configuration_profile_view
+    :subresource_actions:
+      :get:
+      - :name: read
+        :identifier: configuration_profile_view
   :configuration_script_payloads:
     :description: Configuration Script Payloads
     :options:
@@ -855,6 +914,29 @@
       :get:
       - :name: read
         :identifier: configuration_script_view
+  :configured_systems:
+    :description: Configured Systems
+    :options:
+    - :collection
+    - :subcollection
+    :verbs: *g
+    :klass: ConfiguredSystem
+    :collection_actions:
+      :get:
+      - :name: read
+        :identifier: configured_system_view
+    :resource_actions:
+      :get:
+      - :name: read
+        :identifier: configured_system_view
+    :subcollection_actions:
+      :get:
+      - :name: read
+        :identifier: configured_system_view
+    :subresource_actions:
+      :get:
+      - :name: read
+        :identifier: configured_system_view
   :container_groups:
     :description: Container Groups
     :identifier: container_group
@@ -1588,6 +1670,7 @@
     - :policies
     - :policy_profiles
     - :lans
+    - :custom_attributes
     :collection_actions:
       :get:
       - :name: read
@@ -1681,6 +1764,14 @@
       :get:
       - :name: read
         :identifier: host_show
+    :custom_attributes_subcollection_actions:
+      :post:
+      - :name: add
+        :identifier: host_edit
+      - :name: edit
+        :identifier: host_edit
+      - :name: delete
+        :identifier: host_edit
   :instances:
     :description: Instances
     :identifier: instance
@@ -2219,7 +2310,7 @@
     :options:
     - :collection
     - :subcollection
-    :verbs: *gp
+    :verbs: *gpppd
     :klass: MiqPolicySet
     :subcollections:
     - :policies
@@ -2230,15 +2321,12 @@
       :post:
       - :name: query
         :identifier: policy_profile_view
-      - :name: add
+      - :name: create
         :identifier: profile_new
-        :disabled: true
       - :name: edit
         :identifier: profile_edit
-        :disabled: true
       - :name: delete
         :identifier: profile_delete
-        :disabled: true
     :resource_actions:
       :get:
       - :name: read
@@ -2246,11 +2334,11 @@
       :post:
       - :name: edit
         :identifier: profile_edit
-        :disabled: true
+      - :name: delete
+        :identifier: profile_delete
       :delete:
       - :name: delete
         :identifier: profile_delete
-        :disabled: true
     :policies_subcollection_actions:
       :post:
       - :name: assign
@@ -2271,9 +2359,11 @@
     :options:
     - :collection
     - :custom_actions
-    :verbs: *gpd
+    :verbs: *gpppd
     :klass: ExtManagementSystem
     :subcollections:
+    - :configuration_profiles
+    - :configured_systems
     - :tags
     - :policies
     - :policy_profiles
@@ -2303,7 +2393,17 @@
         - ems_infra_show_list
         - ems_block_storage_show_list
       - :name: create
-        :identifier: ems_infra_new
+        :identifiers:
+        - :klass: ManageIQ::Providers::InfraManager
+          :identifier: ems_infra_new
+        - :klass: ManageIQ::Providers::CloudManager
+          :identifier: ems_cloud_new
+        - :klass: ManageIQ::Providers::ContainerManager
+          :identifier: ems_container_new
+        - :klass: ManageIQ::Providers::NetworkManager
+          :identifier: ems_network_new
+        - :klass: Provider
+          :identifier: provider_foreman_add_provider
       - :name: edit
         :identifier: ems_infra_edit
       - :name: refresh
@@ -2312,10 +2412,6 @@
         - ems_cloud_refresh
       - :name: delete
         :identifier: ems_infra_delete
-      - :name: pause
-        :identifier: ems_infra_edit
-      - :name: resume
-        :identifier: ems_infra_edit
       - :name: verify_credentials
         :identifier: ems_infra_new
     :resource_actions:
@@ -2339,13 +2435,19 @@
         :identifier: ems_infra_import_vm
         :options:
         - :validate_action
-      - :name: pause
-        :identifier: ems_infra_edit
-      - :name: resume
-        :identifier: ems_infra_edit
       :delete:
       - :name: delete
         :identifier: ems_infra_delete
+      :patch:
+      - :name: edit
+        :identifier: ems_infra_edit
+      :put:
+      - :name: edit
+        :identifier: ems_infra_edit
+    :configuration_profiles_subresource_actions:
+      :get:
+      - :name: read
+        :identifier: configuration_profile_view
     :tags_subcollection_actions:
       :post:
       - :name: assign
@@ -2625,7 +2727,7 @@
     - :settings
     :options:
     - :collection
-    :verbs: *gpd
+    :verbs: *gp
     :klass: MiqRegion
     :collection_actions:
       :get:
@@ -2636,8 +2738,6 @@
         :identifier: region
       - :name: edit
         :identifier: region_edit
-      - :name: delete
-        :identifier: region_delete
     :resource_actions:
       :get:
       - :name: read
@@ -2645,11 +2745,6 @@
       :post:
       - :name: edit
         :identifier: region_edit
-      - :name: delete
-        :identifier: region_delete
-      :delete:
-      - :name: delete
-        :identifier: region_delete
   :reports:
     :description: Reports
     :identifier: miq_report
@@ -3726,6 +3821,8 @@
       - :name: read
         :identifier: miq_template_show_list
       :post:
+      - :name: check_compliance
+        :identifier: miq_template_check_compliance
       - :name: query
         :identifier: miq_template_show_list
       - :name: refresh
@@ -3743,6 +3840,8 @@
       - :name: read
         :identifier: miq_template_show
       :post:
+      - :name: check_compliance
+        :identifier: miq_template_check_compliance
       - :name: refresh
         :identifier: miq_template_refresh
         :disabled: true
@@ -3954,6 +4053,7 @@
     - :policies
     - :policy_profiles
     - :accounts
+    - :compliances
     - :custom_attributes
     - :security_groups
     - :software
@@ -3979,6 +4079,8 @@
         :identifier: vm_edit
       - :name: add_event
         :identifier: vm_edit
+      - :name: check_compliance
+        :identifier: vm_check_compliance
       - :name: refresh
         :identifier: vm_refresh
       - :name: shutdown_guest
@@ -4051,6 +4153,8 @@
         :identifier: vm_edit
       - :name: add_event
         :identifier: vm_edit
+      - :name: check_compliance
+        :identifier: vm_check_compliance
       - :name: refresh
         :identifier: vm_refresh
       - :name: shutdown_guest
@@ -4115,12 +4219,24 @@
       - :name: read
         :identifier:
         - vm_show
+    :compliances_subcollection_actions:
+      :get:
+      - :name: get
+        :identifier:
+        - vm_show
+        - vm_check_compliance
+        - instance_check_compliance
     :disks_subresource_actions:
       :get:
       - :name: read
         :identifier:
         - vm_show
     :cdroms_subresource_actions:
+      :get:
+      - :name: read
+        :identifier:
+        - vm_show
+    :compliances_subresource_actions:
       :get:
       - :name: read
         :identifier:

@@ -1,37 +1,47 @@
 module Api
   class ProvidersController < BaseController
+    AUTH_TYPE_ATTR    = "auth_type".freeze
+    CONNECTION_ATTRS  = %w(connection_configurations).freeze
+    CREDENTIALS_ATTR  = "credentials".freeze
+    DDF_ATTR          = 'ddf'.freeze
+    DEFAULT_AUTH_TYPE = "default".freeze
+    ENDPOINT_ATTRS    = %w(verify_ssl hostname url ipaddress port security_protocol certificate_authority).freeze
     TYPE_ATTR         = "type".freeze
     ZONE_ATTR         = "zone".freeze
-    CREDENTIALS_ATTR  = "credentials".freeze
-    AUTH_TYPE_ATTR    = "auth_type".freeze
-    DEFAULT_AUTH_TYPE = "default".freeze
-    CONNECTION_ATTRS  = %w(connection_configurations).freeze
-    ENDPOINT_ATTRS    = %w(verify_ssl hostname url ipaddress port security_protocol certificate_authority).freeze
     RESTRICTED_ATTRS  = [TYPE_ATTR, CREDENTIALS_ATTR, ZONE_ATTR, "zone_id"].freeze
 
-    include Subcollections::Policies
-    include Subcollections::PolicyProfiles
-    include Subcollections::Tags
+    include Subcollections::Authentications
     include Subcollections::CloudNetworks
     include Subcollections::CloudSubnets
-    include Subcollections::CloudTenants
-    include Subcollections::CustomAttributes
-    include Subcollections::LoadBalancers
-    include Subcollections::SecurityGroups
-    include Subcollections::Vms
-    include Subcollections::Flavors
     include Subcollections::CloudTemplates
+    include Subcollections::CloudTenants
+    include Subcollections::ConfigurationProfiles
+    include Subcollections::ConfiguredSystems
+    include Subcollections::CustomAttributes
+    include Subcollections::Endpoints
+    include Subcollections::Flavors
     include Subcollections::Folders
-    include Subcollections::Networks
     include Subcollections::Lans
+    include Subcollections::LoadBalancers
+    include Subcollections::Networks
+    include Subcollections::Policies
+    include Subcollections::PolicyProfiles
+    include Subcollections::SecurityGroups
+    include Subcollections::Tags
+    include Subcollections::Vms
 
     before_action :validate_provider_class
 
     def create_resource(type, _id, data = {})
       assert_id_not_specified(data, type)
-      raise BadRequestError, "Must specify credentials" if data[CREDENTIALS_ATTR].nil? && !data.keys.include?(*CONNECTION_ATTRS)
 
-      create_provider(data)
+      if data.delete(DDF_ATTR)
+        create_provider_ddf(data)
+      else
+        raise BadRequestError, "Must specify credentials" if data[CREDENTIALS_ATTR].nil? && !data.key?(*CONNECTION_ATTRS)
+
+        create_provider(data)
+      end
     end
 
     def edit_resource(type, id = nil, data = {})
@@ -39,7 +49,12 @@ module Api
       raise BadRequestError, "Provider type cannot be updated" if data.key?(TYPE_ATTR)
 
       provider = resource_search(id, type, collection_class(:providers))
-      edit_provider(provider, data)
+
+      if data.delete(DDF_ATTR)
+        edit_provider_ddf(provider, data)
+      else
+        edit_provider(provider, data)
+      end
     end
 
     def refresh_resource(type, id = nil, _data = nil)
@@ -89,22 +104,6 @@ module Api
       render_options(:providers, options)
     end
 
-    def pause_resource(type, id, _data)
-      provider = resource_search(id, type, collection_class(type))
-      provider.pause!
-      action_result(true, "Paused #{provider_ident(provider)}")
-    rescue => err
-      action_result(false, "Could not pause Provider - #{err}")
-    end
-
-    def resume_resource(type, id, _data)
-      provider = resource_search(id, type, collection_class(type))
-      provider.resume!
-      action_result(true, "Resumed #{provider_ident(provider)}")
-    rescue => err
-      action_result(false, "Could not resume Provider - #{err}")
-    end
-
     # Process change_password action for a single resource or a collection of resources
     def change_password_resource(type, id, data = {})
       if single_resource?
@@ -114,9 +113,10 @@ module Api
       end
     end
 
-    def verify_credentials_resource(_type, _id, data = {})
+    def verify_credentials_resource(_type, id = nil, data = {})
       klass = fetch_provider_klass(collection_class(:providers), data)
-      zone_name = fetch_zone(data).name
+      zone_name = data.delete('zone_name')
+      data['id'] = id if id
       task_id = klass.verify_credentials_task(current_user, zone_name, data)
       action_result(true, 'Credentials sent for verification', :task_id => task_id)
     rescue => err
@@ -124,6 +124,16 @@ module Api
     end
 
     private
+
+    def authorize_provider(typed_provider_klass)
+      create_action = collection_config["providers"].collection_actions.post.detect { |a| a.name == "create" }
+      provider_spec = create_action.identifiers.detect { |i| i.klass.constantize.name == typed_provider_klass.superclass.name }
+      raise BadRequestError, "Unsupported request class #{typed_provider_klass}" if provider_spec.blank?
+
+      if provider_spec.identifier && !api_user_role_allows?(provider_spec.identifier)
+        raise ForbiddenError, "Create action is forbidden for #{typed_provider_klass} requests"
+      end
+    end
 
     def provider_options(type)
       klass = type.safe_constantize
@@ -134,12 +144,24 @@ module Api
       klass.params_for_create
     end
 
+    def leaf_subclasses
+      ActiveSupport::Dependencies.interlock.loading do
+        ManageIQ::Providers::BaseManager.leaf_subclasses
+      end
+    end
+
+    def supported_types_for_create
+      ActiveSupport::Dependencies.interlock.loading do
+        ExtManagementSystem.supported_types_for_create
+      end
+    end
+
     def providers_options
-      providers_options = ManageIQ::Providers::BaseManager.leaf_subclasses.inject({}) do |po, ems|
+      providers_options = leaf_subclasses.inject({}) do |po, ems|
         po.merge(ems.ems_type => ems.options_description)
       end
 
-      supported_providers = ExtManagementSystem.supported_types_for_create.map do |klass|
+      supported_providers = supported_types_for_create.map do |klass|
         if klass.supports_regions?
           regions = klass.parent::Regions.all.sort_by { |r| r[:description] }.map { |r| r.slice(:name, :description) }
         end
@@ -207,12 +229,29 @@ module Api
     def create_provider(data)
       provider_klass = fetch_provider_klass(collection_class(:providers), data)
       create_data    = fetch_provider_data(provider_klass, data, :requires_zone => true)
-      provider       = provider_klass.create!(create_data)
-      update_provider_authentication(provider, data)
-      provider
-    rescue => err
-      provider.destroy if provider
+      authorize_provider(provider_klass)
+      begin
+        provider = provider_klass.create!(create_data)
+        update_provider_authentication(provider, data)
+        provider
+      rescue => err
+        provider&.destroy
       raise BadRequestError, "Could not create the new provider - #{err}"
+      end
+    end
+
+    def create_provider_ddf(data)
+      provider_klass = fetch_provider_klass(collection_class(:providers), data)
+      provider = provider_klass.create_from_params(data)
+    rescue => err
+      provider.try(:destroy)
+      raise BadRequestError, "Could not create the new provider - #{err}"
+    end
+
+    def edit_provider_ddf(provider, data)
+      provider.edit_with_params(data)
+    rescue => err
+      raise BadRequestError, "Could not update the provider - #{err}"
     end
 
     def edit_provider(provider, data)

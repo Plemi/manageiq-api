@@ -1,6 +1,8 @@
 module Api
   class BaseController
     module Authentication
+      class AuthenticationError < StandardError; end
+
       SYSTEM_TOKEN_TTL = 30.seconds
 
       def auth_mechanism
@@ -8,6 +10,8 @@ module Api
           :system
         elsif request.headers[HttpHeaders::AUTH_TOKEN]
           :token
+        elsif request.headers["HTTP_AUTHORIZATION"].try(:match, /^Bearer (.*)/)
+          :jwt
         elsif request.headers["HTTP_AUTHORIZATION"]
           # For AJAX requests the basic auth type should be distinguished
           request.headers['X-REQUESTED-WITH'] == 'XMLHttpRequest' ? :basic_async : :basic
@@ -34,16 +38,10 @@ module Api
         when :ui_session
           raise AuthenticationError unless valid_ui_session?
           auth_user(session[:userid])
+        when :jwt
+          authenticate_with_jwt
         when :basic, :basic_async, nil
-          success = authenticate_with_http_basic do |u, p|
-            begin
-              timeout = ::Settings.api.authentication_timeout.to_i_with_method
-              user = User.authenticate(u, p, request, :require_user => true, :timeout => timeout)
-              auth_user(user.userid)
-            rescue MiqException::MiqEVMLoginError => e
-              raise AuthenticationError, e.message
-            end
-          end
+          success = authenticate_with_http_basic { |u, p| basic_authentication(u, p) }
           raise AuthenticationError unless success
         end
         log_api_auth
@@ -51,7 +49,7 @@ module Api
         api_log_error("AuthenticationError: #{e.message}")
         response.headers["Content-Type"] = "application/json"
         case auth_mechanism
-        when :system, :token, :ui_session, :basic_async
+        when :jwt, :system, :token, :ui_session, :basic_async
           render :status => 401, :json => ErrorSerializer.new(:unauthorized, e).serialize(true).to_json
         when :basic, nil
           request_http_basic_authentication("Application", ErrorSerializer.new(:unauthorized, e).serialize(true).to_json)
@@ -84,6 +82,10 @@ module Api
       end
 
       private
+
+      def clear_cached_current_user
+        User.current_user = nil
+      end
 
       def api_token_mgr
         Environment.user_token_service.token_mgr('api')
@@ -141,6 +143,22 @@ module Api
           session[:userid].present?,                                # session has a userid stored
           request.origin.nil? || request.origin == request.base_url # origin header if set matches base_url
         ].all?
+      end
+
+      def authenticate_with_jwt
+        timeout = ::Settings.api.authentication_timeout.to_i_with_method
+        user = User.authenticate("", "", request, :require_user => true, :timeout => timeout)
+        auth_user(user.userid)
+      rescue => e
+        raise AuthenticationError, "Failed to Authenticate with JWT - error #{e}"
+      end
+
+      def basic_authentication(username, password)
+        timeout = ::Settings.api.authentication_timeout.to_i_with_method
+        user = User.authenticate(username, password, request, :require_user => true, :timeout => timeout)
+        auth_user(user.userid)
+      rescue MiqException::MiqEVMLoginError => e
+        raise AuthenticationError, e.message
       end
     end
   end

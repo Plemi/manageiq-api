@@ -24,7 +24,7 @@ module Api
         is_ar = obj.kind_of?(ActiveRecord::Base)
         attrs.each do |k|
           next if Api.encrypted_attribute?(k) && api_resource_action_options.exclude?("include_encrypted_attributes")
-          next if is_ar ? !obj.respond_to?(k) : !obj.key?(k)
+          next if is_ar ? !obj.respond_to?(k) : !obj.try(:key?, k)
           result[k] = normalize_attr(k, is_ar ? obj.try(k) : obj[k])
         end
         result
@@ -38,7 +38,7 @@ module Api
           normalize_array(value)
         elsif value.respond_to?(:attributes) || value.respond_to?(:keys)
           normalize_hash(attr, value)
-        elsif attr == "id" || attr.to_s.ends_with?("_id")
+        elsif attr.to_s == "id" || attr.to_s.ends_with?("_id")
           value.to_s
         elsif Api.time_attribute?(attr)
           normalize_time(value)
@@ -54,7 +54,7 @@ module Api
       end
 
       #
-      # Timetamps should all be in the XmlSchema form, an ISO 8601
+      # Timestamps should all be in the XmlSchema form, an ISO 8601
       # UTC time representation as follows: 2014-01-30T18:57:55Z
       #
       # Function takes either a Time string or Seconds since Epoch
@@ -68,7 +68,7 @@ module Api
       #
       # Let's normalize a URL
       #
-      # Note, all URL's are baselined as per the request specifying versioning and such.
+      # Note, all URLs are baselined as per the request specifying versioning and such.
       #
       def normalize_url(value)
         svalue = value.to_s

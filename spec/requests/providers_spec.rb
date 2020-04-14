@@ -17,6 +17,8 @@ describe "Providers API" do
   ENDPOINT_ATTRS = Api::ProvidersController::ENDPOINT_ATTRS
   CREDENTIALS_ATTR = Api::ProvidersController::CREDENTIALS_ATTR
 
+  before { Zone.seed }
+
   let(:default_credentials) { {"userid" => "admin1", "password" => "password1"} }
   let(:metrics_credentials) { {"userid" => "admin2", "password" => "password2", "auth_type" => "metrics"} }
   let(:compound_credentials) { [default_credentials, metrics_credentials] }
@@ -413,7 +415,7 @@ describe "Providers API" do
     end
 
     it 'creates valid foreman provider' do
-      api_basic_authorize collection_action_identifier(:providers, :create)
+      api_basic_authorize collection_action_classed_identifier(:providers, :create, :post, "Provider")
 
       post(api_providers_url + '?provider_class=provider', :params => gen_request(:create, sample_foreman))
 
@@ -433,10 +435,10 @@ describe "Providers API" do
       get api_providers_url, :params => { :provider_class => 'provider' }
 
       expected = {
-        'resources' => [
-          {'href' => "#{api_provider_url(nil, provider)}?provider_class=provider"}
-        ],
-        'actions'   => [a_hash_including('href' => a_string_including('?provider_class=provider'))]
+        'resources' => [{'href' => "#{api_provider_url(nil, provider)}?provider_class=provider"}],
+        'actions'   => a_collection_including(
+          a_hash_including('href' => a_string_including('?provider_class=provider'))
+        )
       }
       expect(response).to have_http_status(:ok)
       expect(response.parsed_body).to include(expected)
@@ -468,10 +470,37 @@ describe "Providers API" do
         .and_return([OvirtSDK4::ProbeResult.new(:version => '3')])
     end
 
+    it 'invokes the DDF creation when ddf=true' do
+      api_basic_authorize collection_action_identifier(:providers, :create)
+
+      expect(ManageIQ::Providers::Amazon::CloudManager).to receive(:create_from_params).and_return('yay')
+
+      post(api_providers_url, :params => {'ddf'             => true,
+                                          'name'            => 'Amazon Test',
+                                          'type'            => 'ManageIQ::Providers::Amazon::CloudManager',
+                                          'zone_name'       => @zone.name,
+                                          'provider_region' => 'us-east-1',
+                                          'endpoints'       => {
+                                            'default' => {
+                                              'userid'   => 'foo',
+                                              'password' => 'bar',
+                                            }
+                                          }})
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body).to eq('results' => ['yay'])
+    end
+
+    it 'handles errors when ddf=true' do
+      api_basic_authorize collection_action_identifier(:providers, :create)
+      post(api_providers_url, :params => {'ddf' => true})
+      expect_bad_request(/Could not create the new provider/)
+    end
+
     it 'allows provider specific attributes to be specified' do
       allow(ManageIQ::Providers::Azure::CloudManager).to receive(:api_allowed_attributes).and_return(%w(azure_tenant_id))
       tenant = FactoryBot.create(:cloud_tenant)
-      api_basic_authorize collection_action_identifier(:providers, :create)
+      api_basic_authorize collection_action_classed_identifier(:providers, :create, :post, "ManageIQ::Providers::CloudManager")
 
       post(api_providers_url, :params => { "type"            => "ManageIQ::Providers::Azure::CloudManager",
                                            "name"            => "sample azure provider",
@@ -512,7 +541,7 @@ describe "Providers API" do
     end
 
     it "supports single provider creation" do
-      api_basic_authorize collection_action_identifier(:providers, :create)
+      api_basic_authorize collection_action_classed_identifier(:providers, :create, :post, "ManageIQ::Providers::InfraManager")
 
       post(api_providers_url, :params => sample_rhevm)
 
@@ -534,7 +563,7 @@ describe "Providers API" do
         let(:containers_class) { klass }
 
         it "supports creation with auth_key specified" do
-          api_basic_authorize collection_action_identifier(:providers, :create)
+          api_basic_authorize collection_action_classed_identifier(:providers, :create, :post, "ManageIQ::Providers::ContainerManager")
 
           post(api_providers_url, :params => sample_containers.merge("credentials" => [containers_credentials]))
 
@@ -555,7 +584,7 @@ describe "Providers API" do
     end
 
     it "supports single provider creation via action" do
-      api_basic_authorize collection_action_identifier(:providers, :create)
+      api_basic_authorize collection_action_classed_identifier(:providers, :create, :post, "ManageIQ::Providers::InfraManager")
 
       post(api_providers_url, :params => gen_request(:create, sample_rhevm))
 
@@ -571,8 +600,17 @@ describe "Providers API" do
       expect(ExtManagementSystem.exists?(provider_id)).to be_truthy
     end
 
+    it "should fail single provider creation via action" do
+      api_basic_authorize collection_action_classed_identifier(:providers, :create, :post, "ManageIQ::Providers::CloudManager")
+
+      post(api_providers_url, :params => gen_request(:create, sample_rhevm))
+
+      expect(response).to have_http_status(:forbidden)
+      expect(response.parsed_body).to include_error_with_message("Create action is forbidden for ManageIQ::Providers::Redhat::InfraManager requests")
+    end
+
     it "supports single provider creation with simple credentials" do
-      api_basic_authorize collection_action_identifier(:providers, :create)
+      api_basic_authorize collection_action_classed_identifier(:providers, :create, :post, "ManageIQ::Providers::InfraManager")
 
       post(api_providers_url, :params => sample_vmware.merge("credentials" => default_credentials))
 
@@ -591,7 +629,7 @@ describe "Providers API" do
     end
 
     it "supports single provider creation with compound credentials" do
-      api_basic_authorize collection_action_identifier(:providers, :create)
+      api_basic_authorize collection_action_classed_identifier(:providers, :create, :post, "ManageIQ::Providers::InfraManager")
 
       post(api_providers_url, :params => sample_rhevm.merge("credentials" => compound_credentials))
 
@@ -612,7 +650,7 @@ describe "Providers API" do
     end
 
     it "supports multiple provider creation" do
-      api_basic_authorize collection_action_identifier(:providers, :create)
+      api_basic_authorize collection_action_classed_identifier(:providers, :create, :post, "ManageIQ::Providers::InfraManager")
 
       post(api_providers_url, :params => gen_request(:create, [sample_vmware, sample_rhevm]))
 
@@ -641,7 +679,7 @@ describe "Providers API" do
         end
 
         it "supports provider with multiple endpoints creation with hawkular" do
-          api_basic_authorize collection_action_identifier(:providers, :create)
+          api_basic_authorize collection_action_classed_identifier(:providers, :create, :post, "ManageIQ::Providers::ContainerManager")
 
           post(api_providers_url, :params => gen_request(:create, sample_containers_multi_end_point_with_hawkular))
 
@@ -665,7 +703,7 @@ describe "Providers API" do
         end
 
         it "supports provider with multiple endpoints creation and prometheus" do
-          api_basic_authorize collection_action_identifier(:providers, :create)
+          api_basic_authorize collection_action_classed_identifier(:providers, :create, :post, "ManageIQ::Providers::ContainerManager")
 
           post(api_providers_url, :params => gen_request(:create, sample_containers_multi_end_point_with_prometheus))
 
@@ -702,6 +740,31 @@ describe "Providers API" do
 
       allow(OvirtSDK4::Probe).to receive(:probe)
         .and_return([OvirtSDK4::ProbeResult.new(:version => '3')])
+    end
+
+    it 'invokes the DDF creation when ddf=true' do
+      api_basic_authorize collection_action_identifier(:providers, :edit)
+
+      provider = FactoryBot.create(:ems_cloud)
+
+      expect_any_instance_of(ManageIQ::Providers::Amazon::CloudManager).to receive(:edit_with_params).and_return(:yay => :yay)
+
+      post(api_provider_url(nil, provider), :params => gen_request(:edit, "name" => "updated provider name", 'ddf' => true))
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body).to eq('yay' => 'yay')
+    end
+
+    it 'handles errors when ddf=true' do
+      api_basic_authorize collection_action_identifier(:providers, :edit)
+
+      provider = FactoryBot.create(:ems_cloud)
+
+      expect_any_instance_of(ManageIQ::Providers::Amazon::CloudManager).to receive(:edit_with_params).and_raise('RandomError')
+
+      post(api_provider_url(nil, provider), :params => gen_request(:edit, "name" => "updated provider name", 'ddf' => true))
+
+      expect_bad_request(/Could not update the provider/)
     end
 
     it "rejects resource edits without appropriate role" do
@@ -1024,102 +1087,6 @@ describe "Providers API" do
 
       expect(response).to have_http_status(:ok)
       expect(response.parsed_body).to include(expected)
-    end
-  end
-
-  describe "Providers pause" do
-    let(:provider) { FactoryBot.create(:ext_management_system) }
-
-    it "rejects pause requests without an appropriate role" do
-      api_basic_authorize
-
-      post(api_provider_url(nil, provider), :params => { :action => "pause" })
-
-      expect(response).to have_http_status(:forbidden)
-    end
-
-    it "pauses a provider" do
-      api_basic_authorize collection_action_identifier(:providers, :pause)
-
-      post(api_provider_url(nil, provider), :params => { :action => "pause" })
-
-      expect(response).to have_http_status(:ok)
-      expect(response.parsed_body).to include("success" => true, "message" => /Paused Provider/)
-    end
-
-    it "can pause multiple providers" do
-      provider2 = FactoryBot.create(:ext_management_system)
-      api_basic_authorize collection_action_identifier(:providers, :pause)
-
-      post(api_providers_url, :params =>
-                                         { :action    => "pause",
-                                           :resources => [
-                                             { "href" => api_provider_url(nil, provider) },
-                                             { "id" => provider2.id }
-                                           ]})
-
-      expected = {
-        "results" => [a_hash_including("success" => true), a_hash_including("success" => true)]
-      }
-      expect(response).to have_http_status(:ok)
-      expect(response.parsed_body).to include(expected)
-    end
-
-    it "returns an action response for errors" do
-      api_basic_authorize collection_action_identifier(:providers, :pause)
-
-      post(api_provider_url(nil, 999_999), :params => { :action => "pause" })
-
-      expect(response).to have_http_status(:ok)
-      expect(response.parsed_body).to include("success" => false)
-    end
-  end
-
-  describe "Providers resume" do
-    let(:provider) { FactoryBot.create(:ext_management_system) }
-
-    it "rejects resume requests without an appropriate role" do
-      api_basic_authorize
-
-      post(api_provider_url(nil, provider), :params => { :action => "resume" })
-
-      expect(response).to have_http_status(:forbidden)
-    end
-
-    it "resumes a provider" do
-      api_basic_authorize collection_action_identifier(:providers, :resume)
-
-      post(api_provider_url(nil, provider), :params => { :action => "resume" })
-
-      expect(response).to have_http_status(:ok)
-      expect(response.parsed_body).to include("success" => true, "message" => /Resumed Provider/)
-    end
-
-    it "can resume multiple providers" do
-      provider2 = FactoryBot.create(:ext_management_system)
-      api_basic_authorize collection_action_identifier(:providers, :resume)
-
-      post(api_providers_url, :params =>
-                                         { :action    => "resume",
-                                           :resources => [
-                                             { "href" => api_provider_url(nil, provider) },
-                                             { "id" => provider2.id }
-                                           ]})
-
-      expected = {
-        "results" => [a_hash_including("success" => true), a_hash_including("success" => true)]
-      }
-      expect(response).to have_http_status(:ok)
-      expect(response.parsed_body).to include(expected)
-    end
-
-    it "returns an action response for errors" do
-      api_basic_authorize collection_action_identifier(:providers, :resume)
-
-      post(api_provider_url(nil, 999_999), :params => { :action => "resume" })
-
-      expect(response).to have_http_status(:ok)
-      expect(response.parsed_body).to include("success" => false)
     end
   end
 
@@ -1615,6 +1582,32 @@ describe "Providers API" do
     end
   end
 
+  context 'GET /api/providers/:id' do
+    it 'includes endpoints and authentications attributes when explcitly asked' do
+      ems = FactoryBot.create(:ext_management_system)
+      api_basic_authorize action_identifier(:providers, :read, :resource_actions, :get)
+
+      get(api_provider_url(nil, ems), :params => {:attributes => 'endpoints,authentications'})
+
+      expect(response.parsed_body['authentications']).to be_an_instance_of(Array)
+      expect(response.parsed_body['endpoints']).to be_an_instance_of(Array)
+
+      expect(response).to have_http_status(:ok)
+    end
+
+    it 'does not include endpoints and authentications attributes by default' do
+      ems = FactoryBot.create(:ext_management_system)
+      api_basic_authorize action_identifier(:providers, :read, :resource_actions, :get)
+
+      get(api_provider_url(nil, ems))
+
+      expect(response.parsed_body['authentications']).to be_nil
+      expect(response.parsed_body['endpoints']).to be_nil
+
+      expect(response).to have_http_status(:ok)
+    end
+  end
+
   context 'GET /api/providers/:id/vms' do
     it 'returns the vms for a provider with an appropriate role' do
       ems = FactoryBot.create(:ext_management_system)
@@ -1801,6 +1794,98 @@ describe "Providers API" do
         api_basic_authorize
 
         get(api_provider_lan_url(nil, ems, lan))
+
+        expect(response).to have_http_status(:forbidden)
+      end
+    end
+  end
+
+  context 'configuration_profiles subcollection' do
+    let(:configuration_profile) { FactoryBot.create(:configuration_profile, :manager => ems) }
+    let(:ems) { FactoryBot.create(:configuration_manager) }
+
+    context 'GET /api/providers/:id/configuration_profiles' do
+      it 'returns the configuration_profiles with an appropriate role' do
+        api_basic_authorize subcollection_action_identifier(:providers, :configuration_profiles, :read, :get)
+
+        expected = {
+          'resources' => [{'href' => api_provider_configuration_profile_url(nil, ems, configuration_profile)}]
+        }
+        get(api_provider_configuration_profiles_url(nil, ems))
+
+        expect(response).to have_http_status(:ok)
+        expect(response.parsed_body).to include(expected)
+      end
+
+      it 'does not return the configuration_profiles without an appropriate role' do
+        api_basic_authorize
+
+        get(api_provider_configuration_profiles_url(nil, ems))
+
+        expect(response).to have_http_status(:forbidden)
+      end
+    end
+
+    context 'GET /api/providers/:id/configuration_profiles/:s_id' do
+      it 'returns the configuration_profiles with an appropriate role' do
+        api_basic_authorize action_identifier(:configuration_profiles, :read, :subresource_actions, :get)
+
+        get(api_provider_configuration_profile_url(nil, ems, configuration_profile))
+
+        expect(response).to have_http_status(:ok)
+        expect(response.parsed_body).to include('id' => configuration_profile.id.to_s)
+      end
+
+      it 'does not return the configuration_profiles without an appropriate role' do
+        api_basic_authorize
+
+        get(api_provider_configuration_profile_url(nil, ems, configuration_profile))
+
+        expect(response).to have_http_status(:forbidden)
+      end
+    end
+  end
+
+  context 'configured_systems subcollection' do
+    let(:configured_system) { FactoryBot.create(:configured_system, :manager => ems) }
+    let(:ems) { FactoryBot.create(:configuration_manager) }
+
+    context 'GET /api/providers/:id/configured_systems' do
+      it 'returns the configured_systems with an appropriate role' do
+        api_basic_authorize subcollection_action_identifier(:providers, :configured_systems, :read, :get)
+
+        expected = {
+          'resources' => [{'href' => api_provider_configured_system_url(nil, ems, configured_system)}]
+        }
+        get(api_provider_configured_systems_url(nil, ems))
+
+        expect(response).to have_http_status(:ok)
+        expect(response.parsed_body).to include(expected)
+      end
+
+      it 'does not return the configured_systems without an appropriate role' do
+        api_basic_authorize
+
+        get(api_provider_configured_systems_url(nil, ems))
+
+        expect(response).to have_http_status(:forbidden)
+      end
+    end
+
+    context 'GET /api/providers/:id/configured_systems/:s_id' do
+      it 'returns the configured_systems with an appropriate role' do
+        api_basic_authorize action_identifier(:configured_systems, :read, :subresource_actions, :get)
+
+        get(api_provider_configured_system_url(nil, ems, configured_system))
+
+        expect(response).to have_http_status(:ok)
+        expect(response.parsed_body).to include('id' => configured_system.id.to_s)
+      end
+
+      it 'does not return the configured_systems without an appropriate role' do
+        api_basic_authorize
+
+        get(api_provider_configured_system_url(nil, ems, configured_system))
 
         expect(response).to have_http_status(:forbidden)
       end
