@@ -32,8 +32,9 @@ module Api
     end
 
     # @return [String] the path portion of the href
+    # (removing '/sso' occurence in the path if present)
     def path
-      @path ||= remove_trailing_slashes(fully_qualified? ? URI.parse(href).path : ensure_prefix(href))
+      @path ||= remove_trailing_slashes(fully_qualified? ? URI.parse(href).path : ensure_prefix(href)).sub(%r{^/api/sso/}, '/api/') # /api/...
     end
 
     # @return [String, nil] the name of the collection if there is

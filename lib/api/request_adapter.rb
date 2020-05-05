@@ -87,6 +87,12 @@ module Api
       @href ||= Href.new(url)
     end
 
+    # Parse original url to detect sso auth api request
+    def self.sso_path?(request)
+      URI.parse(request.original_url).path.match(%r{^/api/sso/})
+      # URI.parse(request.original_url).path.match(%r{^/api/sso/auth})
+    end
+
     def resources
       if json_body.key?("resources")
         json_body["resources"]

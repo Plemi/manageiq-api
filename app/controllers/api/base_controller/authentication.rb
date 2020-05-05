@@ -11,6 +11,8 @@ module Api
           :system
         elsif request.headers[HttpHeaders::AUTH_TOKEN]
           :token
+        elsif RequestAdapter.sso_path?(request)
+          :sso
         elsif request.headers["HTTP_AUTHORIZATION"]
           if jwt_token
             :jwt
@@ -38,6 +40,12 @@ module Api
           authenticate_with_system_token(request.headers[HttpHeaders::MIQ_TOKEN])
         when :token
           authenticate_with_user_token(request.headers[HttpHeaders::AUTH_TOKEN])
+        when :sso
+          # use specific sso headers
+          user_name = request.headers["X-REMOTE-USER"].present? ? request.headers["X-REMOTE-USER"].split("@").first : ""
+          timeout = ::Settings.api.authentication_timeout.to_i_with_method
+          user = User.authenticate(user_name, "", request, :require_user => true, :timeout => timeout)
+          auth_user(user.userid)
         when :ui_session
           raise AuthenticationError unless valid_ui_session?
           auth_user(session[:userid])
